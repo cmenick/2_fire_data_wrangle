@@ -2,9 +2,7 @@
 title: "Hayman Fire Recovery"
 author: "Casey Menick"
 date: "01/31/2022"
-output:
-  pdf_document: default
-  html_document: default
+output: html_document
 ---
 
 ```{r setup, warning=F,message=F}
@@ -47,9 +45,6 @@ full_long <- rbind(ndvi,ndmi,ndsi) %>%
 
 
 ```
-
-
-
 
 ## Question 1) 
 
@@ -124,6 +119,15 @@ What month is the greenest month on average?
 
 ```{r dataread, warning=F,message=F}
 
+full_long_month <- full_long %>%
+  mutate(month=month(DateTime),
+         year=year(DateTime)) %>%
+  filter(data=='ndvi') %>%
+  group_by(month,site) %>%
+  summarize(value=mean(value))
+
+ggplot(full_long_month,aes(as.factor(month),value,color=site)) +
+  geom_point()
 
 ```
 
@@ -132,7 +136,15 @@ What month is the greenest month on average?
 
 What month is the snowiest on average?
 ```{r dataread, warning=F,message=F}
+full_long_month2 <- full_long %>%
+  mutate(month=month(DateTime),
+         year=year(DateTime)) %>%
+  filter(data=='ndsi') %>%
+  group_by(month,site) %>%
+  summarize(value=mean(value))
 
+ggplot(full_long_month2,aes(as.factor(month),value,color=site)) +
+  geom_point()
 
 ```
 
