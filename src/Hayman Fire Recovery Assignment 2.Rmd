@@ -2,8 +2,16 @@
 title: "Hayman Fire Recovery"
 author: "Casey Menick"
 date: "01/31/2022"
-output: html_document
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    toc_depth: 2
 ---
+
+# Data Setup
+
+## Library Import
 
 ```{r setup, warning=F, message=F}
 library(tidyverse)
@@ -17,6 +25,7 @@ library(lubridate)
 knitr::opts_knit$set(root.dir='..')
 ```
 
+## Import Data into Tidy Dataset
 
 ```{r dataread, warning=F, message=F}
 ####-----Reading in Data and Stacking it ----- ####
@@ -24,7 +33,7 @@ knitr::opts_knit$set(root.dir='..')
 setwd('G:/Other computers/Lenovo/Documents/Grad School/Classes/Spring 2022/ES580A7/2_fire_data_wrangle/data')
 
 #Read in individual data files
-ndmi <- read.csv('hayman_ndmi.csv') %>% 
+ndmi <- read.csv('hayman_ndmi.csv') %>%  
   rename(burned=2,unburned=3) %>%
   mutate(data='ndmi')
 
@@ -38,74 +47,92 @@ ndvi <- read.csv('hayman_ndvi.csv')%>%
   mutate(data='ndvi')
 
 # Stack as a tidy dataset
-full_long <- rbind(ndvi,ndmi,ndsi) %>%
-  gather(key='site',value='value',-DateTime,-data) %>%
+full_long <- rbind(ndvi,ndmi,ndsi)%>%
+  pivot_longer(.,cols=c('burned','unburned'),names_to="site") %>% #updated from gather(key='site',value='value',-DateTime,-data)
   filter(!is.na(value))
-
-
 ```
 
-## Question 1) 
+# Aerial Imagery of Hayman Fire
+![](https://upload.wikimedia.org/wikipedia/commons/9/98/Colorado_Rockies_from_space-Hayman_cropped.jpg)
 
-What is the correlation between NDVI and NDMI? - here I want you to
+# Questions to Address
+
+## Question 1
+
+**What is the correlation between NDVI and NDMI? - here I want you to
 convert the full_long dataset in to a wide dataset using the 
 function "spread" and then make a plot that shows the correlation as a
 function of if the site was burned or not (x axis should be ndmi)
-You should exclude winter months and focus on summer months
+You should exclude winter months and focus on summer months** 
+
+*Both sites displayed a positive relationship between NDMI and NDVI, implying that wetness is correlated with greenness. The burned site had a much wider spread of NDMI and NDVI values, which makes sense given the change in that area.*
 
 ```{r warning=F, message=F}
-full_wide <-full_long %>% 
-  spread(key="data",value="value") %>% 
-  filter(!is.na(ndvi)) %>%
+#change dataset from long to wide
+full_wide <-full_long %>%  
+  pivot_wider(.,id_cols=c('DateTime','site','value'),names_from = data) %>%  # updated from spread(key="data",value="value")
+  filter(!is.na(ndvi)) %>% #remove NAs from each column
   filter(!is.na(ndsi)) %>%
   filter(!is.na(ndmi)) %>%
-  mutate(month=month(DateTime),
+  mutate(month=month(DateTime), #convert date to month and year
          year=year(DateTime)) 
 
+#Plot NDMI and NDVI
 ggplot(full_wide%>%filter(month==c(5,6,7,8,9)),aes(ndmi,ndvi,color=site)) +
-  geom_point()+ theme_bw() + labs(title="Relationship Between NDMI and NDVI", subtitle="Comparing burned and unburned areas of the 2002 Hayman Fire")
+  geom_point()+ 
+  geom_smooth(method="lm",se=FALSE) +
+  theme_bw() + 
+  labs(title="Relationship Between NDMI and NDVI", subtitle="Comparing burned and unburned areas of the 2002 Hayman Fire")
 
 ```
 
 
-## Question 2 
+## Question 2
 
-2) What is the correlation between average NDSI (normalized
+**What is the correlation between average NDSI (normalized
  snow index) for January - April and average NDVI for June-August?
 In other words, does the previous year's snow cover influence vegetation
- growth for the following summer?
+ growth for the following summer?**
+
+*There was not much of a relationship between winter NDSI and summer NDVI for both burned and unburned sites. Both sites showed similar values for NDSI, and the unburned having a much higher NDVI.*
 
 ```{r warning=F, message=F}
+#Convert data to add in season field, and pivot wider to have one year row with summer ndvi and winter ndsi columns
 full_long_season <- full_long %>%
-  mutate(month=month(DateTime),
+  mutate(month=month(DateTime), #add in month and year from the date field
          year=year(DateTime)) %>%
-  filter(month %in% c(1,2,3,4,6,7,8),
-         data %in% c('ndvi','ndsi')) %>%
-  mutate(season=if_else(month %in% c(1,2,3,4),"winter","summer")) %>%
-  group_by(season,year,site,data) %>%
+  filter(month %in% c(1,2,3,4,6,7,8), #filter to only summer and winter months of interest, for only ndvi and ndsi
+         data %in% c('ndvi','ndsi')) %>% 
+  mutate(season=if_else(month %in% c(1,2,3,4),"winter","summer")) %>% #create new field for summer and winter, comprised of all months of interest
+  group_by(season,year,site,data) %>% #group by season, year, burn status, and field type; summarize
   summarize(value=mean(value)) %>%
-  ungroup() %>%
-  filter(data=="ndvi" & season=="summer" | data=="ndsi" & season=="winter") %>% 
-  .[c(1,2,3,5)] %>%
-  spread(key="season",value="value")
+  filter(data=="ndvi" & season=="summer" | data=="ndsi" & season=="winter") %>% #select only for summer ndvi and winter ndsi
+  .[c(1,2,3,5)] %>% #remove data field
+  pivot_wider(.,id_cols=c('year', 'site', 'value'),names_from='season') #back to wide, summer/winter values each a column for each year; updated from  spread(key="season",value="value")
 
+#Plot Winter NDSI and Summer NDVI
 ggplot(full_long_season,aes(winter,summer,color=site)) +
   geom_point() +
-  xlab("Winter (Jan-April) NDSI") + ylab("Summer (June-Aug) NDVI") + labs(title="Relationship between Winter NDSI and Summer NDVI",subtitle="Comparing burned and unburned areas of the 2002 Hayman Fire")+ theme_bw()
+  geom_smooth(method="lm",se=FALSE) +
+  xlab("Winter (Jan-April) NDSI") + ylab("Summer (June-Aug) NDVI") + 
+  labs(title="Relationship between Winter NDSI and Summer NDVI",subtitle="Comparing burned and unburned areas of the 2002 Hayman Fire")+ 
+  theme_bw()
 
 ```
 
-## Q3
+## Question 3
 
-How is the snow effect from question 2 different between pre- and post-burn
-and burned and unburned? 
+**How is the snow effect from question 2 different between pre- and post-burn
+and burned and unburned? **
+
+*Winter NDSI still does not have much relationship to summer NDSI for either time point. Before the 2002 burn, both sites had fairly similar NDVI and NDSI values. After the burn, the burned area has much lower NDVI, as would be expected.*
 
 ```{r warning=F, message=F}
-
+#add column 'burnstatus' to reflect pre or post 2002 fire
 full_long_season_status <- full_long_season %>%
   mutate(burnstatus=if_else(year %in% c(1984:2002),"Before 2002 Burn","Post 2002 Burn"))
 
-
+#Plot Winter NDSI and Summer NDVI, compring burned and unburned areas, faceted by time
 ggplot(full_long_season_status,aes(winter,summer,color=site)) +
   geom_point() +
   facet_wrap(~burnstatus) +
@@ -114,10 +141,12 @@ ggplot(full_long_season_status,aes(winter,summer,color=site)) +
 
 ## Question 4
 
-What month is the greenest month on average? 
+**What month is the greenest month on average? **
+
+*The greenest month on average is August for the burned area and September for the unburned area.*
 
 ```{r warning=F, message=F}
-
+#Filter long data to contain just ndvi, arranged by month
 full_long_month <- full_long %>%
   mutate(month=month(DateTime),
          year=year(DateTime)) %>%
@@ -125,16 +154,21 @@ full_long_month <- full_long %>%
   group_by(month,site) %>%
   summarize(value=mean(value))
 
+#Plot NDVI over time
 ggplot(full_long_month,aes(as.factor(month),value,fill=site)) +
   geom_col(position="dodge") + xlab("Month") + ylab("NDVI")+ labs(title="Seasonal NDVI in Burned and Unburned Areas of the 2002 Hayman Fire")+theme_bw()
 
 ```
 
 
-## Question 5) 
+## Question 5
 
-What month is the snowiest on average?
+**What month is the snowiest on average?**
+
+*The snowiest month is January for the burned site and February for the unburned site. *
+
 ```{r warning=F, message=F}
+#Filter long data to just contain NDSI, arranged by month
 full_long_month2 <- full_long %>%
   mutate(month=month(DateTime),
          year=year(DateTime)) %>%
@@ -142,16 +176,18 @@ full_long_month2 <- full_long %>%
   group_by(month,site) %>%
   summarize(value=mean(value))
 
+#Plot NDSI over time
 ggplot(full_long_month2,aes(as.factor(month),value,fill=site)) +
   geom_col(position="dodge") + xlab("Month") + ylab("NDSI")+ theme_bw()+ labs(title="Seasonal NDSI in Burned and Unburned Areas of the 2002 Hayman Fire")
 
 ```
 
 
-## Bonus Question: Redo all problems with `spread` and `gather` using modern tidyverse syntax. 
+## Bonus Questions
+**Redo all problems with `spread` and `gather` using modern tidyverse syntax. **
 
 
-## Bonus Question: Use Climage Engine to pull the same data for the assignment, but updated with 2020/2021 data.
+**Use Climage Engine to pull the same data for the assignment, but updated with 2020/2021 data.**
 
 
 
