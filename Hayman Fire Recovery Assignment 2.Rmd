@@ -7,6 +7,13 @@ output:
     toc: TRUE
     toc_float: TRUE
 ---
+# Background
+
+The Hayman Fire occurred in the summer of 2002, and at the time, was the largest wildfire in Colorado History. It burned nearly 140,000 acres, and caused extreme environmental and monetary damage. There were extensive areas of high-severity burning that will have long-standing impacts on the area. 
+
+This project aims to investigate some relationships between NDMI, NDSI, and NDVI in the area around the fire. Data were taken from ClimateEngine from two areas (one burned, one unburned) from 1984-2019 to look at these trends over time.
+
+![](https://upload.wikimedia.org/wikipedia/commons/9/98/Colorado_Rockies_from_space-Hayman_cropped.jpg)
 
 # Data Setup
 
@@ -47,24 +54,20 @@ ndvi <- read.csv('hayman_ndvi.csv')%>%
 
 # Stack as a tidy dataset
 full_long <- rbind(ndvi,ndmi,ndsi)%>%
-  pivot_longer(.,cols=c('burned','unburned'),names_to="site") %>% #updated from gather(key='site',value='value',-DateTime,-data)
+  pivot_longer(.,cols=c('burned','unburned'),names_to="site") %>% 
+  #updated from gather(key='site',value='value',-DateTime,-data) %>%
   filter(!is.na(value))
 ```
 
-# Aerial Imagery of Hayman Fire
-![](https://upload.wikimedia.org/wikipedia/commons/9/98/Colorado_Rockies_from_space-Hayman_cropped.jpg)
 
-# Questions to Address
+
+# Questions of Interest
 
 ## Question 1
 
-**What is the correlation between NDVI and NDMI? - here I want you to
-convert the full_long dataset in to a wide dataset using the 
-function "spread" and then make a plot that shows the correlation as a
-function of if the site was burned or not (x axis should be ndmi)
-You should exclude winter months and focus on summer months** 
+**What is the correlation between NDVI and NDMI in the burned and unburned areas?** 
 
-*Both sites displayed a positive relationship between NDMI and NDVI, implying that wetness is correlated with greenness. The burned site had a much wider spread of NDMI and NDVI values, which makes sense given the change in that area.*
+*Both sites displayed a positive relationship between NDMI and NDVI over the course of May-September, implying that wetness is correlated with greenness. The burned site had a much wider spread of NDMI and NDVI values, which makes sense given the change to vegetation in that area*
 
 ```{r warning=F, message=F}
 #change dataset from long to wide
@@ -74,26 +77,24 @@ full_wide <-full_long %>%
   filter(!is.na(ndsi)) %>%
   filter(!is.na(ndmi)) %>%
   mutate(month=month(DateTime), #convert date to month and year
-         year=year(DateTime)) 
+         year=year(DateTime),
+         burnstatus=if_else(year %in% c(1984:2002),"Before 2002 Burn","Post 2002 Burn"))
 
 #Plot NDMI and NDVI
 ggplot(full_wide%>%filter(month==c(5,6,7,8,9)),aes(ndmi,ndvi,color=site)) +
   geom_point()+ 
   geom_smooth(method="lm",se=FALSE) +
   theme_bw() + 
-  labs(title="Relationship Between NDMI and NDVI", subtitle="Comparing burned and unburned areas of the 2002 Hayman Fire")
+  labs(title="Relationship Between NDMI and NDVI", subtitle="Comparing burned and unburned areas of the 2002 Hayman Fire") 
 
 ```
 
 
 ## Question 2
 
-**What is the correlation between average NDSI (normalized
- snow index) for January - April and average NDVI for June-August?
-In other words, does the previous year's snow cover influence vegetation
- growth for the following summer?**
+**What is the correlation between average NDSI for January - April and average NDVI for June-August in this area?**
 
-*There was not much of a relationship between winter NDSI and summer NDVI for both burned and unburned sites. Both sites showed similar values for NDSI, and the unburned having a much higher NDVI.*
+*There was not much of a relationship between winter NDSI (January-April) and summer NDVI (June-August) for both burned and unburned sites. This gives evidence to support that the previous year's snow cover does not have much influence on vegetation growth for the following summer. This implies that their are likely other climatic or environmental variables that are more influential on seasonal vegetation growth. Both sites showed similar values for NDSI, and the unburned area unsurprisingly having a much higher NDVI.*
 
 ```{r warning=F, message=F}
 #Convert data to add in season field, and pivot wider to have one year row with summer ndvi and winter ndsi columns
@@ -121,10 +122,9 @@ ggplot(full_long_season,aes(winter,summer,color=site)) +
 
 ## Question 3
 
-**How is the snow effect from question 2 different between pre- and post-burn
-and burned and unburned? **
+**Does the relationship between NDSI and NDVI differ in the burned and unburned areas?**
 
-*Winter NDSI still does not have much relationship to summer NDSI for either time point. Before the 2002 burn, both sites had fairly similar NDVI and NDSI values. After the burn, the burned area has much lower NDVI, as would be expected.*
+*Winter NDSI still does not have much relationship to summer NDSI for either time point. Before the 2002 burn, both sites had fairly similar NDVI and NDSI relationships, with the burned area having slightly lower NDVI overall. After 2002, the burned area has much lower NDVI, as would be expected.*
 
 ```{r warning=F, message=F}
 #add column 'burnstatus' to reflect pre or post 2002 fire
@@ -134,15 +134,17 @@ full_long_season_status <- full_long_season %>%
 #Plot Winter NDSI and Summer NDVI, compring burned and unburned areas, faceted by time
 ggplot(full_long_season_status,aes(winter,summer,color=site)) +
   geom_point() +
+  geom_smooth(method="lm",se=FALSE) +
   facet_wrap(~burnstatus) +
-  xlab("Winter (Jan-April) NDSI") + ylab("Summer (June-Aug) NDVI") + labs(title="Relationship between Winter NDSI and Summer NDVI",subtitle="Comparing burned and unburned areas before and after the 2002 Hayman Fire") + theme_bw()
+  xlab("Winter (Jan-April) NDSI") + ylab("Summer (June-Aug) NDVI") + labs(title="Relationship between Winter NDSI and Summer NDVI",subtitle="Comparing burned and unburned areas before and after the 2002 Hayman Fire") + 
+  theme_bw()
 ```
 
 ## Question 4
 
-**What month is the greenest month on average? **
+**What month is the greenest month on average for the burned and unburned areas? **
 
-*The greenest month on average is August for the burned area and September for the unburned area.*
+*The greenest month on average is August for the burned area and September for the unburned area. The burned area likely has an earlier peak of vegetation, relying on winter snow melt for moisture and more impacted by later season high temperatures or drought*
 
 ```{r warning=F, message=F}
 #Filter long data to contain just ndvi, arranged by month
@@ -155,16 +157,17 @@ full_long_month <- full_long %>%
 
 #Plot NDVI over time
 ggplot(full_long_month,aes(as.factor(month),value,fill=site)) +
-  geom_col(position="dodge") + xlab("Month") + ylab("NDVI")+ labs(title="Seasonal NDVI in Burned and Unburned Areas of the 2002 Hayman Fire")+theme_bw()
+  geom_col(position="dodge") + xlab("Month") + ylab("NDVI")+ labs(title="Seasonal NDVI in Burned and Unburned Areas of the 2002 Hayman Fire")+
+  theme_bw()
 
 ```
 
 
 ## Question 5
 
-**What month is the snowiest on average?**
+**What month is the snowiest month on average for the burned and unburned areas? **
 
-*The snowiest month is January for the burned site and February for the unburned site. *
+*The snowiest month is January for the burned site and February for the unburned site. Overall, the burned site had lower snow cover that arrived later and disappated sooner than the unburned area, likely to due lack of vegetation in the area*
 
 ```{r warning=F, message=F}
 #Filter long data to just contain NDSI, arranged by month
@@ -181,6 +184,18 @@ ggplot(full_long_month2,aes(as.factor(month),value,fill=site)) +
 
 ```
 
+## Additional Questions
+
+*Summer NDVI (May-Sept) is interesting to look at this area over time. Years of drought, marked by much lower NDVI values, are more prevalent in the burned area, indicating that this area was likely more at risk of fire. The fire itself expectedly significantly reduced NDVI in the burned area, but also influenced the nearby unburned area. Both areas have been increasing since 2002.*
+
+```{r warning=F, message=F}
+#Plot NDVI Over Time
+ggplot(full_wide%>%filter(month==c(5,6,7,8,9)),aes(year,ndvi,color=site)) +
+  geom_point()+ 
+  geom_smooth(se=FALSE) +
+  theme_bw() + 
+  labs(title="Summer NDVI Over Time", subtitle="Comparing burned and unburned areas of the 2002 Hayman Fire")
+```
 
 ## Bonus Questions
 **Redo all problems with `spread` and `gather` using modern tidyverse syntax. **
